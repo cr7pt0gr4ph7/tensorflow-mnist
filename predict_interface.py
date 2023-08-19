@@ -73,25 +73,27 @@ def shift(img, sx, sy):
 def pred_from_img(image, train):
     image = image
     train = train
+
     """
-	a placeholder for our image data:
+	A placeholder for our image data:
 	None stands for an unspecified number of images
-	784 = 28*28 pixel
 	"""
-    x = tf.placeholder("float", [None, 784])
+    input_size = 28*28  # 784 = 784 * 784 pixels
+    input_x = tf.placeholder("float", [None, input_size])
 
-    # we need our weights for our neural net
-    W = tf.Variable(tf.zeros([784, 10]))
-    # and the biases
-    b = tf.Variable(tf.zeros([10]))
+    # We need our weights for our neural net...
+    weights_w = tf.Variable(tf.zeros([input_size, 10]))
+
+    # ...and the biases
+    biases_b = tf.Variable(tf.zeros([10]))
 
     """
-	softmax provides a probability based output
-	we need to multiply the image values x and the weights
+	Softmax provides a probability based output.
+	We need to multiply the image values x and the weights
 	and add the biases
-	(the normal procedure, explained in previous articles)
+    (the normal procedure, explained in previous articles)
 	"""
-    y = tf.nn.softmax(tf.matmul(x, W) + b)
+    y = tf.nn.softmax(tf.matmul(input_x, weights_w) + biases_b)
 
     """
 	y_ will be filled with the real values

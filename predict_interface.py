@@ -42,14 +42,41 @@ class PredSet(object):
     def get_bottom_right(self):
         return self.bottom_right
 
+    def get_top(self):
+        return self.top_left[0]
+
+    def get_left(self):
+        return self.top_left[1]
+
+    def get_bottom(self):
+        return self.bottom_right[0]
+
+    def get_right(self):
+        return self.bottom_right[1]
+
     def get_actual_w_h(self):
         return self.actual_w_h
+
+    def get_actual_width(self):
+        return self.actual_w_h[0]
+
+    def get_actual_height(self):
+        return self.actual_w_h[1]
 
     def get_prediction(self):
         return self.prob_with_pred[1]
 
     def get_probability(self):
         return self.prob_with_pred[0]
+
+    def print_to_output(self):
+        print("Prediction for ", self.location)
+        print("Pos")
+        print(self.top_left)
+        print(self.bottom_right)
+        print(self.actual_w_h)
+        print(" ")
+        print(self.prob_with_pred)
 
 
 def getBestShift(img):
@@ -70,70 +97,93 @@ def shift(img, sx, sy):
     return shifted
 
 
-def pred_from_img(image, train):
-    image = image
-    train = train
+class MicroObject(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
-    """
-	A placeholder for our image data:
-	None stands for an unspecified number of images
-	"""
-    input_size = 28*28  # 784 = 784 * 784 pixels
-    input_x = tf.placeholder("float", [None, input_size])
 
-    # We need our weights for our neural net...
-    weights_w = tf.Variable(tf.zeros([input_size, 10]))
+class Predictor(object):
+    def __init__(self):
+        #################################
+        # Initialize the neural network #
+        #################################
+        """
+        A placeholder for our image data:
+        None stands for an unspecified number of images
+        """
+        input_size = 28*28  # 784 = 784 * 784 pixels
+        x = tf.placeholder("float", [None, input_size])
 
-    # ...and the biases
-    biases_b = tf.Variable(tf.zeros([10]))
+        # We need our weights for our neural net...
+        W = tf.Variable(tf.zeros([input_size, 10]))
 
-    """
-	Softmax provides a probability based output.
-	We need to multiply the image values x and the weights
-	and add the biases
-    (the normal procedure, explained in previous articles)
-	"""
-    y = tf.nn.softmax(tf.matmul(input_x, weights_w) + biases_b)
+        # ...and the biases
+        b = tf.Variable(tf.zeros([10]))
 
-    """
-	y_ will be filled with the real values
-	which we want to train (digits 0-9)
-	for an undefined number of images
-	"""
-    y_ = tf.placeholder("float", [None, 10])
+        """
+        Softmax provides a probability based output.
+        We need to multiply the image values x and the weights
+        and add the biases
+        (the normal procedure, explained in previous articles)
+        """
+        y = tf.nn.softmax(tf.matmul(x, W) + b)
 
-    """
-	we use the cross_entropy function
-	which we want to minimize to improve our model
-	"""
-    cross_entropy = -tf.reduce_sum(y_*tf.log(y))
+        """
+        y_ will be filled with the real values
+        which we want to train (digits 0-9)
+        for an undefined number of images
+        """
+        y_ = tf.placeholder("float", [None, 10])
 
-    """
-	use a learning rate of 0.01
-	to minimize the cross_entropy error
-	"""
-    train_step = tf.train.GradientDescentOptimizer(
-        0.01).minimize(cross_entropy)
+        """
+        we use the cross_entropy function
+        which we want to minimize to improve our model
+        """
+        cross_entropy = -tf.reduce_sum(y_*tf.log(y))
 
-    # image = sys.argv[1]
-    # train = False if len(sys.argv) == 2 else sys.argv[2]
-    checkpoint_dir = "cps/"
+        """
+        use a learning rate of 0.01
+        to minimize the cross_entropy error
+        """
+        train_step = tf.train.GradientDescentOptimizer(
+            0.01).minimize(cross_entropy)
 
-    saver = tf.train.Saver()
-    sess = tf.Session()
-    # initialize all variables and run init
-    sess.run(tf.initialize_all_variables())
-    if train:
-        print("TRAIN!!!")
-        # create a MNIST_data folder with the MNIST dataset if necessary
-        mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+        self.model = MicroObject(
+            x=x,
+            W=W,
+            b=b,
+            y=y,
+            y_=y_,
+            cross_entropy=cross_entropy,
+            train_step=train_step
+        )
 
-        # use 1000 batches with a size of 100 each to train our net
+        ##########################################
+        # Initialize the training infrastructure #
+        ##########################################
+
+        self.dataset_dir = "MNIST_data/"
+        self.checkpoint_dir = "cps/"
+        self.checkpoint_file = self.checkpoint_dir+'model.ckpt'
+
+        self.saver = tf.train.Saver()
+        self.sess = tf.Session()
+        # Initialize all variables and run init
+        self.sess.run(tf.initialize_all_variables())
+
+    def train(self):
+        # Create a MNIST_data folder with the MNIST dataset if necessary
+        mnist = input_data.read_data_sets(self.dataset_dir, one_hot=True)
+
+        # Use 1000 batches with a size of 100 each to train our net
         for i in range(1000):
             batch_xs, batch_ys = mnist.train.next_batch(100)
-            # run the train_step function with the given image values (x) and the real output (y_)
-            sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys})
-        saver.save(sess, checkpoint_dir+'model.ckpt')
+            # Run the train_step function with the given image values (x) and the real output (y_)
+            self.sess.run(self.model.train_step, feed_dict={
+                          self.model.x: batch_xs, self.model.y_: batch_ys})
+
+        self.saver.save(self.sess, self.checkpoint_file)
+
         """
 		Let's get the accuracy of our model:
 		our model is correct if the index with the highest y value
@@ -143,160 +193,206 @@ def pred_from_img(image, train):
 		with our test set (mnist.test)
 		We use the keys "images" and "labels" for x and y_
 		"""
-        correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+        correct_prediction = tf.equal(
+            tf.argmax(self.model.y, 1), tf.argmax(self.model.y_, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-        print(sess.run(accuracy, feed_dict={
-              x: mnist.test.images, y_: mnist.test.labels}))
-    else:
+        print(self.sess.run(accuracy, feed_dict={
+              self.model.x: mnist.test.images, self.model.y_: mnist.test.labels}))
+
+    def load_checkpoint(self):
         # Here's where you're restoring the variables w and b.
         # Note that the graph is exactly as it was when the variables were
         # saved in a prior training run.
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+            self.saver.restore(self.sess, ckpt.model_checkpoint_path)
         else:
             print('No checkpoint found')
             exit(1)
 
-        mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
-        correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+        mnist = input_data.read_data_sets(self.dataset_dir, one_hot=True)
+        correct_prediction = tf.equal(
+            tf.argmax(self.model.y, 1), tf.argmax(self.model.y_, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
         print("accuracy: ", sess.run(accuracy, feed_dict={
-              x: mnist.test.images, y_: mnist.test.labels}))
+              self.model.x: mnist.test.images, self.model.y_: mnist.test.labels}))
 
-    # image_path = "img/" + image + ".png"
-    image_path = image
-    image_name = os.path.basename(image)
+    def get_prediction_and_probability(self, flatten):
+        prediction = [tf.reduce_max(self.model.y),
+                      tf.argmax(self.model.y, 1)[0]]
+        prediction_and_probability = self.sess.run(
+            prediction, feed_dict={self.model.x: [flatten]})
+        return prediction_and_probability
 
-    if not os.path.exists(image_path):
-        print("File " + image_path + " doesn't exist")
-        exit(1)
 
-    output_base_path = "pro-img/" + image_name + "/"
+class PredictionSession(object):
+    def __init__(self, predictor):
+        self.predictor = predictor
 
-    if not os.path.exists(output_base_path):
-        os.makedirs(output_base_path)
+    def load_image(self, image):
+        # image_path = "img/" + image + ".png"
+        self.image_path = image
+        self.image_name = os.path.basename(image)
 
-    # Read original image with colors
-    color_complete = cv2.imread(image_path)
+        if not os.path.exists(self.image_path):
+            print("File " + self.image_path + " doesn't exist")
+            exit(1)
 
-    # Read original image as grayscale
-    gray_complete = cv2.imread(image_path, 0)
+        self.output_base_path = "pro-img/" + self.image_name + "/"
 
-    # Create a black & white version of the grayscale image
-    # (which we will perform the detection on)
-    _, gray_complete = cv2.threshold(
-        255-gray_complete, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        if not os.path.exists(self.output_base_path):
+            os.makedirs(self.output_base_path)
 
-    # Debugging: Write the black & white image
-    cv2.imwrite(output_base_path + "compl.png", gray_complete)
+        # Read original image with colors
+        self.color_complete = cv2.imread(self.image_path)
 
-    digit_image = -np.ones(gray_complete.shape)
+        # Read original image as grayscale
+        self.gray_complete = cv2.imread(self.image_path, 0)
 
-    height, width = gray_complete.shape
+        # Create a black & white version of the grayscale image
+        # (which we will perform the detection on)
+        _, self.gray_complete = cv2.threshold(
+            255-self.gray_complete, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-    predSet_ret = []
+        # Debugging: Write the black & white image
+        cv2.imwrite(self.output_base_path + "compl.png", self.gray_complete)
 
-    """
-	crop into several images
-	"""
-    for cropped_width in range(100, 300, 20):
-        for cropped_height in range(100, 300, 20):
-            for shift_x in range(0, width-cropped_width, int(cropped_width/4)):
-                for shift_y in range(0, height-cropped_height, int(cropped_height/4)):
-                    gray = gray_complete[shift_y:shift_y +
-                                         cropped_height, shift_x:shift_x + cropped_width]
-                    if np.count_nonzero(gray) <= 20:
-                        continue
+        self.digit_image = -np.ones(self.gray_complete.shape)
 
-                    if (np.sum(gray[0]) != 0) or (np.sum(gray[:, 0]) != 0) or (np.sum(gray[-1]) != 0) or (np.sum(gray[:,
-                                                                                                                      -1]) != 0):
-                        continue
+        self.height, self.width = self.gray_complete.shape
 
-                    top_left = np.array([shift_y, shift_x])
-                    bottom_right = np.array(
-                        [shift_y+cropped_height, shift_x + cropped_width])
+    def crop_images(self):
+        pass
 
-                    while np.sum(gray[0]) == 0:
-                        top_left[0] += 1
-                        gray = gray[1:]
+    def run_prediction(self):
+        self.predictions = []
 
-                    while np.sum(gray[:, 0]) == 0:
-                        top_left[1] += 1
-                        gray = np.delete(gray, 0, 1)
+        """
+        crop into several images
+        """
+        for cropped_width in range(100, 300, 20):
+            for cropped_height in range(100, 300, 20):
+                for shift_x in range(0, self.width-cropped_width, int(cropped_width/4)):
+                    for shift_y in range(0, self.height-cropped_height, int(cropped_height/4)):
+                        gray = self.gray_complete[shift_y:shift_y +
+                                                  cropped_height, shift_x:shift_x + cropped_width]
+                        if np.count_nonzero(gray) <= 20:
+                            continue
 
-                    while np.sum(gray[-1]) == 0:
-                        bottom_right[0] -= 1
-                        gray = gray[:-1]
+                        if (np.sum(gray[0]) != 0) or (np.sum(gray[:, 0]) != 0) or (np.sum(gray[-1]) != 0) or (np.sum(gray[:,
+                                                                                                                          -1]) != 0):
+                            continue
 
-                    while np.sum(gray[:, -1]) == 0:
-                        bottom_right[1] -= 1
-                        gray = np.delete(gray, -1, 1)
+                        top_left = np.array([shift_y, shift_x])
+                        bottom_right = np.array(
+                            [shift_y+cropped_height, shift_x + cropped_width])
 
-                    actual_w_h = bottom_right-top_left
-                    if (np.count_nonzero(digit_image[top_left[0]:bottom_right[0], top_left[1]:bottom_right[1]]+1) >
-                            0.2*actual_w_h[0]*actual_w_h[1]):
-                        continue
+                        while np.sum(gray[0]) == 0:
+                            top_left[0] += 1
+                            gray = gray[1:]
 
-                    print("------------------")
-                    print("------------------")
+                        while np.sum(gray[:, 0]) == 0:
+                            top_left[1] += 1
+                            gray = np.delete(gray, 0, 1)
 
-                    rows, cols = gray.shape
-                    compl_dif = abs(rows-cols)
-                    half_Sm = int(compl_dif/2)
-                    half_Big = half_Sm if half_Sm*2 == compl_dif else half_Sm+1
-                    if rows > cols:
-                        gray = np.lib.pad(
-                            gray, ((0, 0), (half_Sm, half_Big)), 'constant')
-                    else:
-                        gray = np.lib.pad(
-                            gray, ((half_Sm, half_Big), (0, 0)), 'constant')
+                        while np.sum(gray[-1]) == 0:
+                            bottom_right[0] -= 1
+                            gray = gray[:-1]
 
-                    gray = cv2.resize(gray, (20, 20))
-                    gray = np.lib.pad(gray, ((4, 4), (4, 4)), 'constant')
+                        while np.sum(gray[:, -1]) == 0:
+                            bottom_right[1] -= 1
+                            gray = np.delete(gray, -1, 1)
 
-                    shiftx, shifty = getBestShift(gray)
-                    shifted = shift(gray, shiftx, shifty)
-                    gray = shifted
+                        actual_w_h = bottom_right-top_left
+                        if (np.count_nonzero(self.digit_image[top_left[0]:bottom_right[0], top_left[1]:bottom_right[1]]+1) >
+                                0.2*actual_w_h[0]*actual_w_h[1]):
+                            continue
 
-                    cv2.imwrite(output_base_path+"shifted"+"_" +
-                                str(shift_x)+"_"+str(shift_y)+".png", gray)
+                        print("------------------")
+                        print("------------------")
 
-                    """
-					all images in the training set have an range from 0-1
-					and not from 0-255 so we divide our flatten images
-					(a one dimensional vector with our 784 pixels)
-					to use the same 0-1 based range
-					"""
-                    flatten = gray.flatten() / 255.0
+                        rows, cols = gray.shape
+                        compl_dif = abs(rows-cols)
+                        half_Sm = int(compl_dif/2)
+                        half_Big = half_Sm if half_Sm*2 == compl_dif else half_Sm+1
+                        if rows > cols:
+                            gray = np.lib.pad(
+                                gray, ((0, 0), (half_Sm, half_Big)), 'constant')
+                        else:
+                            gray = np.lib.pad(
+                                gray, ((half_Sm, half_Big), (0, 0)), 'constant')
 
-                    print("Prediction for ", (shift_x, shift_y, cropped_width))
-                    print("Pos")
-                    print(top_left)
-                    print(bottom_right)
-                    print(actual_w_h)
-                    print(" ")
-                    prediction = [tf.reduce_max(y), tf.argmax(y, 1)[0]]
-                    pred = sess.run(prediction, feed_dict={x: [flatten]})
-                    print(pred)
+                        gray = cv2.resize(gray, (20, 20))
+                        gray = np.lib.pad(gray, ((4, 4), (4, 4)), 'constant')
 
-                    predSet_ret.append(PredSet((shift_x, shift_y, cropped_width),
-                                               top_left,
-                                               bottom_right,
-                                               actual_w_h,
-                                               pred))
+                        shiftx, shifty = getBestShift(gray)
+                        shifted = shift(gray, shiftx, shifty)
+                        gray = shifted
 
-                    digit_image[top_left[0]:bottom_right[0],
-                                top_left[1]:bottom_right[1]] = pred[1]
+                        cv2.imwrite(self.output_base_path+"shifted"+"_" +
+                                    str(shift_x)+"_"+str(shift_y)+".png", gray)
 
-                    cv2.rectangle(color_complete, tuple(
-                        top_left[::-1]), tuple(bottom_right[::-1]), color=(0, 255, 0), thickness=5)
+                        """
+                        All images in the training set have a range from 0-1
+                        and not from 0-255, so we divide our flattened images
+                        (a one-dimensional vector with our 784 pixels)
+                        by 255 to use the same 0-1 based range.
+                        """
+                        flatten = gray.flatten() / 255.0
 
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    cv2.putText(color_complete, str(pred[1]), (top_left[1], bottom_right[0]+50),
-                                font, fontScale=1.4, color=(0, 255, 0), thickness=4)
-                    cv2.putText(color_complete, format(pred[0]*100, ".1f")+"%", (top_left[1]+30, bottom_right[0]+60),
-                                font, fontScale=0.8, color=(0, 255, 0), thickness=2)
+                        pred = self.predictor.get_prediction_and_probability(
+                            flatten)
 
-    cv2.imwrite(output_base_path+"digitized_image.png", color_complete)
-    return predSet_ret
+                        prediction_result = PredSet((shift_x, shift_y, cropped_width),
+                                                    top_left, bottom_right, actual_w_h, pred)
+
+                        prediction_result.print_to_output()
+                        self.predictions.append(prediction_result)
+
+                        self.store_digit_image(prediction_result)
+                        self.annotate_image(prediction_result)
+
+    def store_digit_image(self, prediction_result):
+        p = prediction_result
+
+        self.digit_image[p.get_top():p.get_bottom(),
+                         p.get_left():p.get_right()] = p.get_prediction()
+
+    def annotate_image(self, prediction_result):
+        p = prediction_result
+
+        # Draw a rectangle around the area
+        cv2.rectangle(self.color_complete,
+                      (p.get_left(), p.get_top()),
+                      (p.get_right(), p.get_bottom()),
+                      color=(0, 255, 0), thickness=5)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        # Write the prediction value {0,1,..,9} next to the rectangle
+        cv2.putText(self.color_complete, str(p.get_prediction()),
+                    (p.get_left(), p.get_bottom()+50),
+                    font, fontScale=1.4, color=(0, 255, 0), thickness=4)
+
+        # Write the probability [0%, 100%] next to it
+        cv2.putText(self.color_complete, format(p.get_probability()*100, ".1f")+"%",
+                    (p.get_left()+30, p.get_bottom()+60),
+                    font, fontScale=0.8, color=(0, 255, 0), thickness=2)
+
+    def write_annotated_image(self):
+        cv2.imwrite(self.output_base_path +
+                    "digitized_image.png", self.color_complete)
+
+
+def pred_from_img(image, train):
+    image = image
+    train = train
+
+    predictor = Predictor()
+    pred_sess = PredictionSession(predictor)
+
+    pred_sess.load_image(image)
+    pred_sess.run_prediction()
+    pred_sess.write_annotated_image()
+
+    return pred_sess.predictions

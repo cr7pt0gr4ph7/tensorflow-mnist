@@ -1,4 +1,5 @@
 MNIST_data/
+pro-img/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

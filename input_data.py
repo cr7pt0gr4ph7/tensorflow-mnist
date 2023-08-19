@@ -2,7 +2,7 @@
 
 import gzip
 import os
-import urllib.request, urllib.parse, urllib.error
+import urllib
 import numpy
 SOURCE_URL = 'http://yann.lecun.com/exdb/mnist/'
 def maybe_download(filename, work_directory):

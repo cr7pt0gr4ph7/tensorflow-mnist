@@ -1,4 +1,7 @@
-import tensorflow as tf
+# import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import input_data
 import cv2
 import numpy as np
@@ -159,16 +162,19 @@ def pred_from_img(image, train):
 
 
 
-	if not os.path.exists("img/" + image + ".png"):
-		print("File img/" + image + ".png doesn't exist")
+	# image_path = "img/" + image + ".png"
+	image_path = image
+
+	if not os.path.exists(image_path):
+		print("File " + image_path + " doesn't exist")
 		exit(1)
 
 	# read original image
-	color_complete = cv2.imread("img/" + image + ".png")
+	color_complete = cv2.imread(image_path)
 
-	print(("read", "img/" + image + ".png"))
+	print(("read", image_path))
 	# read the bw image
-	gray_complete = cv2.imread("img/" + image + ".png", 0)
+	gray_complete = cv2.imread(image_path, 0)
 
 	# better black and white version
 	_, gray_complete = cv2.threshold(255-gray_complete, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)

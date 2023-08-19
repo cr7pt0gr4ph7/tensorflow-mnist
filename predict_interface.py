@@ -53,21 +53,21 @@ class PredSet(object):
 
 
 def getBestShift(img):
-    cy,cx = ndimage.measurements.center_of_mass(img)
-    print(cy,cx)
+	cy,cx = ndimage.measurements.center_of_mass(img)
+	print(cy,cx)
 
-    rows,cols = img.shape
-    shiftx = np.round(cols/2.0-cx).astype(int)
-    shifty = np.round(rows/2.0-cy).astype(int)
+	rows,cols = img.shape
+	shiftx = np.round(cols/2.0-cx).astype(int)
+	shifty = np.round(rows/2.0-cy).astype(int)
 
-    return shiftx,shifty
+	return shiftx,shifty
 
 
 def shift(img,sx,sy):
-    rows,cols = img.shape
-    M = np.float32([[1,0,sx],[0,1,sy]])
-    shifted = cv2.warpAffine(img,M,(cols,rows))
-    return shifted
+	rows,cols = img.shape
+	M = np.float32([[1,0,sx],[0,1,sy]])
+	shifted = cv2.warpAffine(img,M,(cols,rows))
+	return shifted
 
 
 def pred_from_img(image, train):
@@ -160,29 +160,31 @@ def pred_from_img(image, train):
 		accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 		print("accuracy: ", sess.run(accuracy, feed_dict={x: mnist.test.images, y_: mnist.test.labels}))
 
-
-
 	# image_path = "img/" + image + ".png"
 	image_path = image
+	image_name = os.path.basename(image)
 
 	if not os.path.exists(image_path):
 		print("File " + image_path + " doesn't exist")
 		exit(1)
 
-	# read original image
+	output_base_path = "pro-img/"
+
+	if not os.path.exists(output_base_path):
+		os.makedirs(output_base_path)
+
+	# Read original image with colors
 	color_complete = cv2.imread(image_path)
 
-	print(("read", image_path))
-	# read the bw image
+	# Read original image as grayscale
 	gray_complete = cv2.imread(image_path, 0)
 
-	# better black and white version
+	# Create a black & white version of the grayscale image
+	# (which we will perform the detection on)
 	_, gray_complete = cv2.threshold(255-gray_complete, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-	if not os.path.exists("pro-img"):
-		os.makedirs("pro-img")
-	
-	cv2.imwrite("pro-img/compl.png", gray_complete)
+	# Debugging: Write the black & white image
+	cv2.imwrite(output_base_path + "compl.png", gray_complete)
 
 	digit_image = -np.ones(gray_complete.shape)
 
@@ -249,7 +251,7 @@ def pred_from_img(image, train):
 					shifted = shift(gray,shiftx,shifty)
 					gray = shifted
 
-					cv2.imwrite("pro-img/"+image+"_"+str(shift_x)+"_"+str(shift_y)+".png", gray)
+					cv2.imwrite(output_base_path+image_name+"_"+str(shift_x)+"_"+str(shift_y)+".png", gray)
 
 					"""
 					all images in the training set have an range from 0-1
@@ -271,7 +273,7 @@ def pred_from_img(image, train):
 					print(pred)
 					
 					predSet_ret.append(PredSet((shift_x, shift_y, cropped_width),
-											    top_left,
+												top_left,
 												bottom_right,
 												actual_w_h,
 												pred))
@@ -288,8 +290,5 @@ def pred_from_img(image, train):
 								font,fontScale=0.8,color=(0,255,0),thickness=2)
 
 
-	cv2.imwrite("pro-img/"+image+"_digitized_image.png", color_complete)
+	cv2.imwrite(output_base_path+image_name+"_digitized_image.png", color_complete)
 	return predSet_ret
-
-
-

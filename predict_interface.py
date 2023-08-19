@@ -168,7 +168,7 @@ def pred_from_img(image, train):
 		print("File " + image_path + " doesn't exist")
 		exit(1)
 
-	output_base_path = "pro-img/"
+	output_base_path = "pro-img/" + image_name + "/"
 
 	if not os.path.exists(output_base_path):
 		os.makedirs(output_base_path)
@@ -251,7 +251,7 @@ def pred_from_img(image, train):
 					shifted = shift(gray,shiftx,shifty)
 					gray = shifted
 
-					cv2.imwrite(output_base_path+image_name+"_"+str(shift_x)+"_"+str(shift_y)+".png", gray)
+					cv2.imwrite(output_base_path+"shifted"+"_"+str(shift_x)+"_"+str(shift_y)+".png", gray)
 
 					"""
 					all images in the training set have an range from 0-1
@@ -290,5 +290,5 @@ def pred_from_img(image, train):
 								font,fontScale=0.8,color=(0,255,0),thickness=2)
 
 
-	cv2.imwrite(output_base_path+image_name+"_digitized_image.png", color_complete)
+	cv2.imwrite(output_base_path+"digitized_image.png", color_complete)
 	return predSet_ret

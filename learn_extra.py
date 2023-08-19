@@ -6,22 +6,25 @@ import sys
 import os
 import math
 
-def getBestShift(img):
-    cy,cx = ndimage.measurements.center_of_mass(img)
 
-    rows,cols = img.shape
+def getBestShift(img):
+    cy, cx = ndimage.measurements.center_of_mass(img)
+
+    rows, cols = img.shape
     shiftx = np.round(cols/2.0-cx).astype(int)
     shifty = np.round(rows/2.0-cy).astype(int)
 
-    return shiftx,shifty
+    return shiftx, shifty
 
-def shift(img,sx,sy):
-    rows,cols = img.shape
-    M = np.float32([[1,0,sx],[0,1,sy]])
-    shifted = cv2.warpAffine(img,M,(cols,rows))
+
+def shift(img, sx, sy):
+    rows, cols = img.shape
+    M = np.float32([[1, 0, sx], [0, 1, sy]])
+    shifted = cv2.warpAffine(img, M, (cols, rows))
     return shifted
 
-def get_x_by_image(folder,image,reverse=False):
+
+def get_x_by_image(folder, image, reverse=False):
     # read the image
     gray = cv2.imread(folder+"/"+image, 0)
 
@@ -31,7 +34,8 @@ def get_x_by_image(folder,image,reverse=False):
     else:
         gray = cv2.resize(gray, (28, 28))
     # better black and white version
-    (thresh, gray) = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    (thresh, gray) = cv2.threshold(gray, 128,
+                                   255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
     while np.sum(gray[0]) == 0:
         gray = gray[1:]
@@ -60,8 +64,10 @@ def get_x_by_image(folder,image,reverse=False):
         # first cols than rows
         gray = cv2.resize(gray, (cols, rows))
 
-    colsPadding = (int(math.ceil((28 - cols) / 2.0)), int(math.floor((28 - cols) / 2.0)))
-    rowsPadding = (int(math.ceil((28 - rows) / 2.0)), int(math.floor((28 - rows) / 2.0)))
+    colsPadding = (int(math.ceil((28 - cols) / 2.0)),
+                   int(math.floor((28 - cols) / 2.0)))
+    rowsPadding = (int(math.ceil((28 - rows) / 2.0)),
+                   int(math.floor((28 - rows) / 2.0)))
     gray = np.lib.pad(gray, (rowsPadding, colsPadding), 'constant')
 
     shiftx, shifty = getBestShift(gray)
@@ -77,22 +83,25 @@ def get_x_by_image(folder,image,reverse=False):
     flatten = gray.flatten() / 255.0
     return flatten
 
+
 def get_y_by_digit(digit):
     arr = np.zeros((10))
     arr[digit] = 1
     return arr
 
-def get_learning_batch(folder,reverse=False):
+
+def get_learning_batch(folder, reverse=False):
     batch_xs = []
     batch_ys = []
     for file in os.listdir(folder):
         if file.endswith(".png"):
             digit = file[-5:-4]
             y = get_y_by_digit(digit)
-            x = get_x_by_image(folder,file,reverse=reverse)
+            x = get_x_by_image(folder, file, reverse=reverse)
             batch_xs.append(x)
             batch_ys.append(y)
     return batch_xs, batch_ys
+
 
 """
 a placeholder for our image data:
@@ -102,7 +111,7 @@ None stands for an unspecified number of images
 x = tf.placeholder("float", [None, 784])
 
 # we need our weights for our neural net
-W = tf.Variable(tf.zeros([784,10]))
+W = tf.Variable(tf.zeros([784, 10]))
 # and the biases
 b = tf.Variable(tf.zeros([10]))
 
@@ -112,14 +121,14 @@ we need to multiply the image values x and the weights
 and add the biases
 (the normal procedure, explained in previous articles)
 """
-y = tf.nn.softmax(tf.matmul(x,W) + b)
+y = tf.nn.softmax(tf.matmul(x, W) + b)
 
 """
 y_ will be filled with the real values
 which we want to train (digits 0-9)
 for an undefined number of images
 """
-y_ = tf.placeholder("float", [None,10])
+y_ = tf.placeholder("float", [None, 10])
 
 """
 we use the cross_entropy function
@@ -156,13 +165,10 @@ else:
     exit(1)
 
 if len(sys.argv) > 2:
-    reverse =sys.argv[2]
+    reverse = sys.argv[2]
 else:
     reverse = False
 
-batch_xs, batch_ys = get_learning_batch(folder,reverse=reverse)
+batch_xs, batch_ys = get_learning_batch(folder, reverse=reverse)
 sess.run(train_step, feed_dict={x: batch_xs, y_: batch_ys})
 saver.save(sess, checkpoint_dir+'model.ckpt')
-
-
-
